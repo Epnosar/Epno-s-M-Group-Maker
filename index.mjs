@@ -14,7 +14,7 @@ import {
 } from 'discord.js';
 import fs from 'fs';
 
-const STATE_FILE = './state.json';
+const STATE_FILE = '/data/state.json';
 
 /* ----------------------------- state helpers ----------------------------- */
 
