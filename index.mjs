@@ -82,7 +82,22 @@ function pruneOldSessions(guildState, keep = 12) {
 /* ----------------------------- permission helpers ----------------------------- */
 
 function isOfficer(member) {
-  return member.permissions.has(PermissionsBitField.Flags.ManageGuild);
+  if (!member) return false;
+
+  // Always allow real admins
+  if (member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+    return true;
+  }
+
+  // Allow configured officer roles
+  const allowedRoles = (process.env.OFFICER_ROLES || '')
+    .split(',')
+    .map(r => r.trim())
+    .filter(Boolean);
+
+  if (!allowedRoles.length) return false;
+
+  return member.roles.cache.some(role => allowedRoles.includes(role.id));
 }
 
 /* ----------------------------- UI helpers ----------------------------- */
