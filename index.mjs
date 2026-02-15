@@ -405,6 +405,19 @@ const commands = [
         .setDescription('Publish the current draft to the channel (officer-only)')
     )
     .addSubcommand(sc =>
+      sc.setName('setlock')
+        .setDescription('Set or change the lock time for the current signup session (officer-only)')
+        .addIntegerOption(o =>
+          o.setName('minutes_from_now')
+            .setDescription('Lock in X minutes from now (e.g., 60 = 1 hour)')
+            .setRequired(true)
+    )
+ )
+    .addSubcommand(sc =>
+      sc.setName('unlock')
+       .setDescription('Remove the lock time for the current signup session (officer-only)')
+    )
+    .addSubcommand(sc =>
       sc.setName('roll')
         .setDescription('Roll groups and post immediately (officer-only)')
         .addIntegerOption(o => o.setName('groups').setDescription('How many groups to try to form'))
@@ -586,6 +599,54 @@ client.on('interactionCreate', async (interaction) => {
     embeds: [buildDraftEmbed(session, session.lastDraft, 'Final Groups')]
   });
 
+  return;
+}
+
+    if (sub === 'setlock') {
+  const session = getCurrentSession(guildState);
+  if (!session) {
+    await interaction.reply({ content: 'No active session. Use /mplus create first.', ephemeral: true });
+    return;
+  }
+
+  const minutes = interaction.options.getInteger('minutes_from_now');
+  session.lockAt = Date.now() + minutes * 60_000;
+
+  saveState(state);
+
+  // Update the original signup message to show the new lock time
+  try {
+    const channel = await client.channels.fetch(session.channelId);
+    const msg = await channel.messages.fetch(session.messageId);
+    await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildButtons(session.id) });
+  } catch {
+    // If the message was deleted or can't be fetched, we still keep the lock time in state
+  }
+
+  await interaction.reply({
+    content: `Updated lock time to <t:${Math.floor(session.lockAt / 1000)}:F>.`,
+    ephemeral: true
+  });
+  return;
+} 
+
+    if (sub === 'unlock') {
+  const session = getCurrentSession(guildState);
+  if (!session) {
+    await interaction.reply({ content: 'No active session. Use /mplus create first.', ephemeral: true });
+    return;
+  }
+
+  session.lockAt = null;
+  saveState(state);
+
+  try {
+    const channel = await client.channels.fetch(session.channelId);
+    const msg = await channel.messages.fetch(session.messageId);
+    await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildButtons(session.id) });
+  } catch {}
+
+  await interaction.reply({ content: 'Lock removed. Signups are open.', ephemeral: true });
   return;
 }
 
