@@ -631,9 +631,6 @@ client.on('interactionCreate', async (interaction) => {
     return;
   }
 
-  const userId = interaction.user.id;
-  const displayName = interaction.member?.displayName || interaction.user.username;
-
     const userId = interaction.user.id;
     const displayName = interaction.member?.displayName || interaction.user.username;
 
