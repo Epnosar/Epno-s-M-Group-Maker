@@ -93,26 +93,43 @@ function rolesToLabel(roleSet) {
 }
 
 function buildSignupEmbed(session) {
-  const lines = Object.entries(session.signups || {})
-    .map(([userId, info]) => {
-      const name = info.displayName || `<@${userId}>`;
-      const roles = new Set(info.roles || []);
-      return `• ${name}: **${rolesToLabel(roles)}**`;
-    })
-    .sort((a, b) => a.localeCompare(b));
+  const signups = session.signups || {};
+  const entries = Object.entries(signups).map(([userId, info]) => ({
+    id: userId,
+    name: info.displayName || `<@${userId}>`,
+    roles: new Set(info.roles || [])
+  }));
+
+  const tanks = entries.filter(p => p.roles.has('TANK'));
+  const heals = entries.filter(p => p.roles.has('HEAL'));
+  const dps = entries.filter(p => p.roles.has('DPS'));
+
+  const possibleGroups = Math.min(
+    tanks.length,
+    heals.length,
+    Math.floor(dps.length / 3),
+    Math.floor(entries.length / 5)
+  );
+
+  const list = (arr) => arr.length ? arr.map(p => `• ${p.name}`).join('\n') : '_None_';
 
   const lockLine = session.lockAt
-    ? `**Lock:** <t:${Math.floor(session.lockAt / 1000)}:F>\n`
-    : `**Lock:** Not set\n`;
+    ? `<t:${Math.floor(session.lockAt / 1000)}:F>`
+    : 'Not set';
 
   return new EmbedBuilder()
-    .setTitle(session.title || 'Mythic+ Signups')
-    .setDescription(
-      (session.description ? `${session.description}\n\n` : '') +
-      lockLine +
-      `**Signups:** ${lines.length}\n\n` +
-      (lines.length ? lines.join('\n') : '_Nobody signed up yet. Stunning._')
+    .setTitle(`🗝️ ${session.title || 'Mythic+ Signups'}`)
+    .setDescription(session.description ? session.description : 'Click roles below to sign up.')
+    .setColor(0x8A2BE2) // purple, because why not
+    .addFields(
+      { name: `⏳ Lock Time`, value: lockLine, inline: true },
+      { name: `👥 Signups`, value: `${entries.length}`, inline: true },
+      { name: `✅ Possible Groups`, value: `${possibleGroups}`, inline: true },
+      { name: `🛡️ Tanks (${tanks.length})`, value: list(tanks), inline: true },
+      { name: `💚 Healers (${heals.length})`, value: list(heals), inline: true },
+      { name: `⚔️ DPS (${dps.length})`, value: list(dps), inline: true }
     )
+    .setTimestamp(new Date())
     .setFooter({ text: `Mythic+ Organizer` });
 }
 
@@ -120,22 +137,46 @@ function buildButtons(sessionId) {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`mplus:${sessionId}:toggle:TANK`)
-      .setLabel('Tank')
+      .setLabel('🛡️ Tank')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`mplus:${sessionId}:toggle:HEAL`)
-      .setLabel('Healer')
+      .setLabel('💚 Healer')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`mplus:${sessionId}:toggle:DPS`)
-      .setLabel('DPS')
+      .setLabel('⚔️ DPS')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`mplus:${sessionId}:leave`)
-      .setLabel('Leave')
+      .setLabel('🚪 Leave')
       .setStyle(ButtonStyle.Danger)
   );
   return [row];
+}
+
+ function buildDraftEmbed(session, draft, title = 'Groups Draft') {
+  const lines = [];
+
+  draft.groups.forEach((g, idx) => {
+    const dps = [g.dps1, g.dps2, g.dps3].filter(Boolean).map(p => p.name).join(', ') || '—';
+    lines.push(
+      `**Group ${idx + 1}**\n` +
+      `🛡️ ${g.tank?.name ?? '—'}\n` +
+      `💚 ${g.heal?.name ?? '—'}\n` +
+      `⚔️ ${dps}\n`
+    );
+  });
+
+  const bench = draft.bench?.length ? draft.bench.map(p => p.name).join(', ') : 'None';
+
+  return new EmbedBuilder()
+    .setTitle(`📋 ${title}`)
+    .setDescription(lines.join('\n'))
+    .setColor(0x00BFFF)
+    .addFields({ name: `🪑 Bench (${draft.bench?.length || 0})`, value: bench })
+    .setFooter({ text: session.title || 'Mythic+ Night' })
+    .setTimestamp(new Date());
 }
 
 /* ----------------------------- grouping solver ----------------------------- */
@@ -447,10 +488,9 @@ client.on('interactionCreate', async (interaction) => {
       saveState(state);
 
       await interaction.reply({
-        content:
-          `**Preview draft (not posted):**\n\n${formatDraft(draft)}\n\n` +
-          `Use \`/mplus swap\` to trade players, or \`/mplus publish\` when you’re happy.`,
-        ephemeral: true
+       content: `Preview draft (not posted). Use /mplus swap then /mplus publish.`,
+       embeds: [buildDraftEmbed(session, draft, 'Preview Draft')],
+       ephemeral: true
       });
       return;
     }
@@ -520,21 +560,27 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (sub === 'publish') {
-      const session = getCurrentSession(guildState);
-      if (!session) {
-        await interaction.reply({ content: 'No active session. Use /mplus create first.', ephemeral: true });
-        return;
-      }
-      if (!session.lastDraft) {
-        await interaction.reply({ content: 'Nothing to publish yet. Run /mplus preview first.', ephemeral: true });
-        return;
-      }
+  const session = getCurrentSession(guildState);
+  if (!session) {
+    await interaction.reply({ content: 'No active session. Use /mplus create first.', ephemeral: true });
+    return;
+  }
+  if (!session.lastDraft) {
+    await interaction.reply({ content: 'Nothing to publish yet. Run /mplus preview first.', ephemeral: true });
+    return;
+  }
 
-      const text = formatDraft(session.lastDraft);
-      await interaction.reply({ content: 'Published.', ephemeral: true });
-      await interaction.channel.send({ content: text });
-      return;
-    }
+  // Acknowledge the command privately (so the officer gets feedback)
+  await interaction.reply({ content: 'Published.', ephemeral: true });
+
+  // Post publicly to the channel
+  await interaction.channel.send({
+    content: `📣 **Groups posted!**`,
+    embeds: [buildDraftEmbed(session, session.lastDraft, 'Final Groups')]
+  });
+
+  return;
+}
 
     if (sub === 'roll') {
       const session = getCurrentSession(guildState);
