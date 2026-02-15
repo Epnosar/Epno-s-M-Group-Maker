@@ -613,14 +613,26 @@ client.on('interactionCreate', async (interaction) => {
 
   /* ----------------------------- buttons ----------------------------- */
   if (interaction.isButton()) {
-    const [prefix, sid, action, payload] = interaction.customId.split(':');
-    if (prefix !== 'mplus') return;
+  const [prefix, sid, action, payload] = interaction.customId.split(':');
+  if (prefix !== 'mplus') return;
 
-    const session = getSessionById(guildState, sid);
-    if (!session) {
-      await interaction.reply({ content: 'This signup session no longer exists.', ephemeral: true });
-      return;
-    }
+  const session = getSessionById(guildState, sid);
+  if (!session) {
+    await interaction.reply({ content: 'This signup session no longer exists.', ephemeral: true });
+    return;
+  }
+
+  // ADD THIS BLOCK HERE
+  if (session.lockAt && Date.now() >= session.lockAt) {
+    await interaction.reply({
+      content: '🔒 Signups are locked.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  const userId = interaction.user.id;
+  const displayName = interaction.member?.displayName || interaction.user.username;
 
     const userId = interaction.user.id;
     const displayName = interaction.member?.displayName || interaction.user.username;
