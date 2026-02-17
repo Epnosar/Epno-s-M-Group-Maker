@@ -160,6 +160,13 @@ function classIcon(classId) {
   return CLASS_EMOJI_TEXT[classId] || '❔';
 }
 
+function playerClassIconForRole(player, roleKey) {
+  if (!player) return '';
+  const classes = player.classes || {};
+  const classId = classes[roleKey] || null;
+  return classId ? classIcon(classId) : '';
+}
+
 function rolesToLabel(roleSet) {
   const arr = [...roleSet].sort();
   return arr.length ? arr.join(', ') : 'None';
@@ -265,14 +272,26 @@ for (const c of WOW_CLASSES) {
   const lines = [];
 
   draft.groups.forEach((g, idx) => {
-    const dps = [g.dps1, g.dps2, g.dps3].filter(Boolean).map(p => p.name).join(', ') || '—';
-    lines.push(
-      `**Group ${idx + 1}**\n` +
-      `🛡️ ${g.tank?.name ?? '—'}\n` +
-      `💚 ${g.heal?.name ?? '—'}\n` +
-      `⚔️ ${dps}\n`
-    );
-  });
+  const tank = g.tank
+    ? `${playerClassIconForRole(g.tank, 'TANK')} ${g.tank.name}`
+    : '—';
+
+  const heal = g.heal
+    ? `${playerClassIconForRole(g.heal, 'HEAL')} ${g.heal.name}`
+    : '—';
+
+  const dpsPlayers = [g.dps1, g.dps2, g.dps3].filter(Boolean);
+  const dps = dpsPlayers.length
+    ? dpsPlayers.map(p => `${playerClassIconForRole(p, 'DPS')} ${p.name}`).join(', ')
+    : '—';
+
+  lines.push(
+    `**Group ${idx + 1}**\n` +
+    `🛡️ ${tank}\n` +
+    `💚 ${heal}\n` +
+    `⚔️ ${dps}\n`
+  );
+});
 
   const bench = draft.bench?.length ? draft.bench.map(p => p.name).join(', ') : 'None';
 
