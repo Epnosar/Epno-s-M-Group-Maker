@@ -11,7 +11,8 @@ import {
   EmbedBuilder,
   PermissionsBitField,
   StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder
+  StringSelectMenuOptionBuilder,
+  Partials
 } from 'discord.js';
 
 
