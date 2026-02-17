@@ -171,6 +171,25 @@ function rolesToLabel(roleSet) {
   const arr = [...roleSet].sort();
   return arr.length ? arr.join(', ') : 'None';
 }
+function hydrateDraftClassesFromSignups(session, draft) {
+  const signups = session.signups || {};
+
+  const attach = (p) => {
+    if (!p) return;
+    const info = signups[p.id];
+    if (info?.classes) p.classes = info.classes;
+  };
+
+  for (const g of draft.groups || []) {
+    attach(g.tank);
+    attach(g.heal);
+    attach(g.dps1);
+    attach(g.dps2);
+    attach(g.dps3);
+  }
+
+  for (const p of draft.bench || []) attach(p);
+}
 
 function buildSignupEmbed(session) {
   const signups = session.signups || {};
@@ -687,6 +706,8 @@ client.on('interactionCreate', async (interaction) => {
 
       aRef.container[aRef.key] = bPlayer;
       bRef.container[bRef.key] = aPlayer;
+
+      hydrateDraftClassesFromSignups(session, draft);
 
       session.lastDraft = draft;
       saveState(state);
