@@ -307,10 +307,11 @@ for (const c of WOW_CLASSES) {
 /* ----------------------------- grouping solver ----------------------------- */
 
 function rollGroups(signups, desiredGroups = null, attempts = 200) {
-  const players = Object.entries(signups || {}).map(([id, info]) => ({
+    const players = Object.entries(signups || {}).map(([id, info]) => ({
     id,
     name: info.displayName || `<@${id}>`,
-    roles: new Set(info.roles || [])
+    roles: new Set(info.roles || []),
+    classes: info.classes || {} // <-- ADD THIS
   }));
 
   const tanks = players.filter(p => p.roles.has('TANK')).length;
@@ -437,14 +438,14 @@ function formatGroups(result) {
 function draftFromResult(result) {
   return {
     createdAt: Date.now(),
-    groups: result.groups.map(g => ({
-      tank: g.tank ? { id: g.tank.id, name: g.tank.name, roles: [...g.tank.roles] } : null,
-      heal: g.heal ? { id: g.heal.id, name: g.heal.name, roles: [...g.heal.roles] } : null,
-      dps1: g.dps?.[0] ? { id: g.dps[0].id, name: g.dps[0].name, roles: [...g.dps[0].roles] } : null,
-      dps2: g.dps?.[1] ? { id: g.dps[1].id, name: g.dps[1].name, roles: [...g.dps[1].roles] } : null,
-      dps3: g.dps?.[2] ? { id: g.dps[2].id, name: g.dps[2].name, roles: [...g.dps[2].roles] } : null
+        groups: result.groups.map(g => ({
+      tank: g.tank ? { id: g.tank.id, name: g.tank.name, roles: [...g.tank.roles], classes: g.tank.classes || {} } : null,
+      heal: g.heal ? { id: g.heal.id, name: g.heal.name, roles: [...g.heal.roles], classes: g.heal.classes || {} } : null,
+      dps1: g.dps?.[0] ? { id: g.dps[0].id, name: g.dps[0].name, roles: [...g.dps[0].roles], classes: g.dps[0].classes || {} } : null,
+      dps2: g.dps?.[1] ? { id: g.dps[1].id, name: g.dps[1].name, roles: [...g.dps[1].roles], classes: g.dps[1].classes || {} } : null,
+      dps3: g.dps?.[2] ? { id: g.dps[2].id, name: g.dps[2].name, roles: [...g.dps[2].roles], classes: g.dps[2].classes || {} } : null
     })),
-    bench: result.bench.map(p => ({ id: p.id, name: p.name, roles: [...p.roles] }))
+    bench: result.bench.map(p => ({ id: p.id, name: p.name, roles: [...p.roles], classes: p.classes || {} }))
   };
 }
 
