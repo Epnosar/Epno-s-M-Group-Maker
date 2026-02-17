@@ -112,6 +112,12 @@ const WOW_CLASSES = [
   { id: 'EVOKER', label: 'Evoker' }
 ];
 
+const ROLE_CLASSES = {
+  TANK: new Set(['WARRIOR', 'PALADIN', 'DEATH_KNIGHT', 'MONK', 'DRUID', 'DEMON_HUNTER']),
+  HEAL: new Set(['PALADIN', 'PRIEST', 'SHAMAN', 'MONK', 'DRUID', 'EVOKER']),
+  DPS:  new Set(WOW_CLASSES.map(c => c.id)) // all classes can DPS
+};
+
 function classLabel(classId) {
   return WOW_CLASSES.find(c => c.id === classId)?.label || 'Unset';
 }
@@ -194,13 +200,17 @@ function buildComponents(sessionId) {
         .setValue('UNSET')
     );
 
-    for (const c of WOW_CLASSES) {
-      menu.addOptions(
-        new StringSelectMenuOptionBuilder()
-          .setLabel(c.label)
-          .setValue(c.id)
-      );
-    }
+    const allowed = ROLE_CLASSES[roleKey] || new Set();
+
+for (const c of WOW_CLASSES) {
+  if (!allowed.has(c.id)) continue;
+
+  menu.addOptions(
+    new StringSelectMenuOptionBuilder()
+      .setLabel(c.label)
+      .setValue(c.id)
+  );
+}
 
     return new ActionRowBuilder().addComponents(menu);
   };
@@ -768,6 +778,17 @@ if (!roles.has(roleKey)) {
 }
 
   const value = interaction.values[0];
+
+const allowed = ROLE_CLASSES[roleKey] || new Set();
+
+if (value !== 'UNSET' && !allowed.has(value)) {
+  await interaction.reply({
+    content: 'That class cannot perform that role.',
+    ephemeral: true
+  });
+  return;
+}
+
   session.signups[userId].classes[roleKey] = (value === 'UNSET') ? null : value;
 
   saveState(state);
