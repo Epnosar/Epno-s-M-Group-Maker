@@ -13,6 +13,8 @@ import {
   PermissionsBitField
 } from 'discord.js';
 import fs from 'fs';
+import { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
+
 
 const STATE_FILE = '/data/state.json';
 
@@ -94,6 +96,26 @@ function isOfficer(member) {
 
 /* ----------------------------- UI helpers ----------------------------- */
 
+const WOW_CLASSES = [
+  { id: 'WARRIOR', label: 'Warrior' },
+  { id: 'PALADIN', label: 'Paladin' },
+  { id: 'HUNTER', label: 'Hunter' },
+  { id: 'ROGUE', label: 'Rogue' },
+  { id: 'PRIEST', label: 'Priest' },
+  { id: 'DEATH_KNIGHT', label: 'Death Knight' },
+  { id: 'SHAMAN', label: 'Shaman' },
+  { id: 'MAGE', label: 'Mage' },
+  { id: 'WARLOCK', label: 'Warlock' },
+  { id: 'MONK', label: 'Monk' },
+  { id: 'DRUID', label: 'Druid' },
+  { id: 'DEMON_HUNTER', label: 'Demon Hunter' },
+  { id: 'EVOKER', label: 'Evoker' }
+];
+
+function classLabel(classId) {
+  return WOW_CLASSES.find(c => c.id === classId)?.label || 'Unset';
+}
+
 function rolesToLabel(roleSet) {
   const arr = [...roleSet].sort();
   return arr.length ? arr.join(', ') : 'None';
@@ -101,24 +123,24 @@ function rolesToLabel(roleSet) {
 
 function buildSignupEmbed(session) {
   const signups = session.signups || {};
-  const entries = Object.entries(signups).map(([userId, info]) => ({
-    id: userId,
-    name: info.displayName || `<@${userId}>`,
-    roles: new Set(info.roles || [])
-  }));
 
-  const tanks = entries.filter(p => p.roles.has('TANK'));
-  const heals = entries.filter(p => p.roles.has('HEAL'));
-  const dps = entries.filter(p => p.roles.has('DPS'));
+  const entries = Object.entries(signups).map(([userId, info]) => {
+    const name = info.displayName || `<@${userId}>`;
+    const roles = new Set(info.roles || []);
+    const classes = info.classes || { TANK: null, HEAL: null, DPS: null };
 
-  const possibleGroups = Math.min(
-    tanks.length,
-    heals.length,
-    Math.floor(dps.length / 3),
-    Math.floor(entries.length / 5)
-  );
+    const parts = [];
+    if (roles.has('TANK')) parts.push(`🛡️ ${classLabel(classes.TANK)}`);
+    if (roles.has('HEAL')) parts.push(`💚 ${classLabel(classes.HEAL)}`);
+    if (roles.has('DPS'))  parts.push(`⚔️ ${classLabel(classes.DPS)}`);
 
-  const list = (arr) => arr.length ? arr.map(p => `• ${p.name}`).join('\n') : '_None_';
+    return `• ${name}  |  ${parts.length ? parts.join('  ') : 'No roles selected'}`;
+  });
+
+  const tanks = Object.values(signups).filter(s => (s.roles || []).includes('TANK')).length;
+  const heals = Object.values(signups).filter(s => (s.roles || []).includes('HEAL')).length;
+  const dps   = Object.values(signups).filter(s => (s.roles || []).includes('DPS')).length;
+  const possibleGroups = Math.min(tanks, heals, Math.floor(dps / 3), Math.floor(entries.length / 5));
 
   const lockLine = session.lockAt
     ? `<t:${Math.floor(session.lockAt / 1000)}:F>`
@@ -127,21 +149,19 @@ function buildSignupEmbed(session) {
   return new EmbedBuilder()
     .setTitle(`🗝️ ${session.title || 'Mythic+ Signups'}`)
     .setDescription(session.description ? session.description : 'Click roles below to sign up.')
-    .setColor(0x8A2BE2) // purple, because why not
+    .setColor(0x8A2BE2)
     .addFields(
       { name: `⏳ Lock Time`, value: lockLine, inline: true },
       { name: `👥 Signups`, value: `${entries.length}`, inline: true },
       { name: `✅ Possible Groups`, value: `${possibleGroups}`, inline: true },
-      { name: `🛡️ Tanks (${tanks.length})`, value: list(tanks), inline: true },
-      { name: `💚 Healers (${heals.length})`, value: list(heals), inline: true },
-      { name: `⚔️ DPS (${dps.length})`, value: list(dps), inline: true }
+      { name: `📋 Roster`, value: entries.length ? entries.join('\n') : '_Nobody signed up yet._' }
     )
     .setTimestamp(new Date())
     .setFooter({ text: `Mythic+ Organizer` });
 }
 
-function buildButtons(sessionId) {
-  const row = new ActionRowBuilder().addComponents(
+function buildComponents(sessionId) {
+  const buttonRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`mplus:${sessionId}:toggle:TANK`)
       .setLabel('🛡️ Tank')
@@ -159,7 +179,37 @@ function buildButtons(sessionId) {
       .setLabel('🚪 Leave')
       .setStyle(ButtonStyle.Danger)
   );
-  return [row];
+
+  const makeClassMenuRow = (roleKey, label) => {
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(`mplus:${sessionId}:class:${roleKey}`)
+      .setPlaceholder(label)
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    // First option = Unset
+    menu.addOptions(
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Unset')
+        .setValue('UNSET')
+    );
+
+    for (const c of WOW_CLASSES) {
+      menu.addOptions(
+        new StringSelectMenuOptionBuilder()
+          .setLabel(c.label)
+          .setValue(c.id)
+      );
+    }
+
+    return new ActionRowBuilder().addComponents(menu);
+  };
+
+  const tankRow = makeClassMenuRow('TANK', 'Select Tank class');
+  const healRow = makeClassMenuRow('HEAL', 'Select Healer class');
+  const dpsRow  = makeClassMenuRow('DPS',  'Select DPS class');
+
+  return [buttonRow, tankRow, healRow, dpsRow];
 }
 
  function buildDraftEmbed(session, draft, title = 'Groups Draft') {
@@ -480,7 +530,7 @@ client.on('interactionCreate', async (interaction) => {
       pruneOldSessions(guildState, 12);
 
       const embed = buildSignupEmbed(session);
-      const components = buildButtons(session.id);
+      const components = buildComponents(session.id);
 
       const msg = await interaction.channel.send({ embeds: [embed], components });
       session.messageId = msg.id;
@@ -618,7 +668,7 @@ client.on('interactionCreate', async (interaction) => {
   try {
     const channel = await client.channels.fetch(session.channelId);
     const msg = await channel.messages.fetch(session.messageId);
-    await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildButtons(session.id) });
+    await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildComponents(session.id) });
   } catch {
     // If the message was deleted or can't be fetched, we still keep the lock time in state
   }
@@ -643,7 +693,7 @@ client.on('interactionCreate', async (interaction) => {
   try {
     const channel = await client.channels.fetch(session.channelId);
     const msg = await channel.messages.fetch(session.messageId);
-    await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildButtons(session.id) });
+    await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildComponents(session.id) });
   } catch {}
 
   await interaction.reply({ content: 'Lock removed. Signups are open.', ephemeral: true });
@@ -680,7 +730,61 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   /* ----------------------------- buttons ----------------------------- */
-  if (interaction.isButton()) {
+  
+if (interaction.isStringSelectMenu()) {
+  const [prefix, sid, kind, roleKey] = interaction.customId.split(':');
+  if (prefix !== 'mplus' || kind !== 'class') return;
+
+  const state = loadState();
+  const guildState = ensureGuildState(state, interaction.guildId);
+  const session = getSessionById(guildState, sid);
+
+  if (!session) {
+    await interaction.reply({ content: 'This signup session no longer exists.', ephemeral: true });
+    return;
+  }
+
+  // Optional: respect lock
+  if (session.lockAt && Date.now() >= session.lockAt) {
+    await interaction.reply({ content: '🔒 Signups are locked.', ephemeral: true });
+    return;
+  }
+
+  const userId = interaction.user.id;
+  const displayName = interaction.member?.displayName || interaction.user.username;
+
+  session.signups ||= {};
+  session.signups[userId] ||= { roles: [], displayName, classes: { TANK: null, HEAL: null, DPS: null } };
+  session.signups[userId].displayName = displayName;
+  session.signups[userId].classes ||= { TANK: null, HEAL: null, DPS: null };
+
+const roles = new Set(session.signups[userId].roles || []);
+if (!roles.has(roleKey)) {
+  await interaction.reply({
+    content: `Pick the **${roleKey}** role first.`,
+    ephemeral: true
+  });
+  return;
+}
+
+  const value = interaction.values[0];
+  session.signups[userId].classes[roleKey] = (value === 'UNSET') ? null : value;
+
+  saveState(state);
+
+  // Update signup message
+  try {
+    const channel = await client.channels.fetch(session.channelId);
+    const msg = await channel.messages.fetch(session.messageId);
+    await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildComponents(session.id) });
+  } catch {}
+
+  await interaction.reply({
+    content: `Updated ${roleKey} class to **${session.signups[userId].classes[roleKey] ? classLabel(session.signups[userId].classes[roleKey]) : 'Unset'}**.`,
+    ephemeral: true
+  });
+}
+if (interaction.isButton()) {
   const [prefix, sid, action, payload] = interaction.customId.split(':');
   if (prefix !== 'mplus') return;
 
@@ -703,7 +807,8 @@ client.on('interactionCreate', async (interaction) => {
     const displayName = interaction.member?.displayName || interaction.user.username;
 
     session.signups ||= {};
-    session.signups[userId] ||= { roles: [], displayName };
+    session.signups[userId] ||= { roles: [], displayName, classes: { TANK: null, HEAL: null, DPS: null } };
+    session.signups[userId].classes ||= { TANK: null, HEAL: null, DPS: null };
 
     if (action === 'toggle') {
       const role = payload; // TANK/HEAL/DPS
@@ -721,7 +826,7 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const channel = await client.channels.fetch(session.channelId);
         const msg = await channel.messages.fetch(session.messageId);
-        await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildButtons(session.id) });
+        await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildComponents(session.id) });
       } catch {
         // If message got deleted, ignore.
       }
@@ -740,7 +845,7 @@ client.on('interactionCreate', async (interaction) => {
       try {
         const channel = await client.channels.fetch(session.channelId);
         const msg = await channel.messages.fetch(session.messageId);
-        await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildButtons(session.id) });
+        await msg.edit({ embeds: [buildSignupEmbed(session)], components: buildComponents(session.id) });
       } catch {}
 
       await interaction.reply({ content: 'Removed you from signups.', ephemeral: true });
