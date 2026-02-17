@@ -470,18 +470,36 @@ function draftFromResult(result) {
 
 function formatDraft(draft) {
   if (!draft?.groups?.length) return 'No draft available.';
+
   const lines = [];
+
   draft.groups.forEach((g, idx) => {
-    lines.push(`**Group ${idx + 1}**`);
-    lines.push(`Tank: ${g.tank?.name ?? '—'}`);
-    lines.push(`Healer: ${g.heal?.name ?? '—'}`);
-    const dps = [g.dps1, g.dps2, g.dps3].filter(Boolean).map(p => p.name);
-    lines.push(`DPS: ${dps.length ? dps.join(', ') : '—'}`);
-    lines.push('');
+    const tank = g.tank
+      ? `${playerClassIconForRole(g.tank, 'TANK')} ${g.tank.name}`
+      : '—';
+
+    const heal = g.heal
+      ? `${playerClassIconForRole(g.heal, 'HEAL')} ${g.heal.name}`
+      : '—';
+
+    const dpsPlayers = [g.dps1, g.dps2, g.dps3].filter(Boolean);
+    const dps = dpsPlayers.length
+      ? dpsPlayers.map(p => `${playerClassIconForRole(p, 'DPS')} ${p.name}`).join(', ')
+      : '—';
+
+    lines.push(
+      `**Group ${idx + 1}**\n` +
+      `🛡️ ${tank}\n` +
+      `💚 ${heal}\n` +
+      `⚔️ ${dps}\n`
+    );
   });
+
   if (draft.bench?.length) {
-    lines.push(`**Bench (${draft.bench.length})**: ${draft.bench.map(p => p.name).join(', ')}`);
+    const bench = draft.bench.map(p => `${playerClassIconForRole(p, 'DPS')} ${p.name}`).join(', ');
+    lines.push(`**Bench (${draft.bench.length})**: ${bench}`);
   }
+
   return lines.join('\n');
 }
 
@@ -713,9 +731,10 @@ client.on('interactionCreate', async (interaction) => {
       saveState(state);
 
       await interaction.reply({
-        content: `Swapped **${aPlayer.name}** and **${bPlayer.name}**.\n\n${formatDraft(draft)}`,
-        ephemeral: true
-      });
+  content: `Swapped **${aPlayer.name}** and **${bPlayer.name}**.`,
+  embeds: [buildDraftEmbed(session, draft, 'Draft After Swap')],
+  ephemeral: true
+});
       return;
     }
 
