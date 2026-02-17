@@ -2,18 +2,17 @@ import 'dotenv/config';
 import {
   Client,
   GatewayIntentBits,
-  Partials,
-  REST,
-  Routes,
   SlashCommandBuilder,
+  Routes,
+  REST,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  PermissionsBitField
+  PermissionsBitField,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder
 } from 'discord.js';
-import fs from 'fs';
-import { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
 
 
 const STATE_FILE = '/data/state.json';
@@ -112,6 +111,22 @@ const WOW_CLASSES = [
   { id: 'EVOKER', label: 'Evoker' }
 ];
 
+const CLASS_EMOJI_OBJ = {
+  DEATH_KNIGHT: { id: '1473173683936825468', name: 'deathknight' },
+  DEMON_HUNTER: { id: '1473173752236740650', name: 'demonhunter' },
+  DRUID:        { id: '1473173789868163096', name: 'druid' },
+  EVOKER:       { id: '1473173914841649242', name: 'evoker' },
+  HUNTER:       { id: '1473173951055265873', name: 'hunter' },
+  MAGE:         { id: '1473173989601054720', name: 'mage' },
+  MONK:         { id: '1473174023369134091', name: 'monk' },
+  PALADIN:      { id: '1473174060476268595', name: 'paladin' },
+  PRIEST:       { id: '1473174094882144478', name: 'priest' },
+  ROGUE:        { id: '1473174132261650544', name: 'rogue' },
+  SHAMAN:       { id: '1473174189048332410', name: 'shaman' },
+  WARLOCK:      { id: '1473174229573701785', name: 'warlock' },
+  WARRIOR:      { id: '1473174345336754258', name: 'warrior' }
+};
+
 const ROLE_CLASSES = {
   TANK: new Set(['WARRIOR', 'PALADIN', 'DEATH_KNIGHT', 'MONK', 'DRUID', 'DEMON_HUNTER']),
   HEAL: new Set(['PALADIN', 'PRIEST', 'SHAMAN', 'MONK', 'DRUID', 'EVOKER']),
@@ -120,6 +135,26 @@ const ROLE_CLASSES = {
 
 function classLabel(classId) {
   return WOW_CLASSES.find(c => c.id === classId)?.label || 'Unset';
+}
+
+const CLASS_EMOJI_TEXT = {
+  DEATH_KNIGHT: '<:deathknight:1473173683936825468>',
+  DEMON_HUNTER: '<:demonhunter:1473173752236740650>',
+  DRUID:        '<:druid:1473173789868163096>',
+  EVOKER:       '<:evoker:1473173914841649242>',
+  HUNTER:       '<:hunter:1473173951055265873>',
+  MAGE:         '<:mage:1473173989601054720>',
+  MONK:         '<:monk:1473174023369134091>',
+  PALADIN:      '<:paladin:1473174060476268595>',
+  PRIEST:       '<:priest:1473174094882144478>',
+  ROGUE:        '<:rogue:1473174132261650544>',
+  SHAMAN:       '<:shaman:1473174189048332410>',
+  WARLOCK:      '<:warlock:1473174229573701785>',
+  WARRIOR:      '<:warrior:1473174345336754258>'
+};
+
+function classIcon(classId) {
+  return CLASS_EMOJI_TEXT[classId] || '❔';
 }
 
 function rolesToLabel(roleSet) {
@@ -136,9 +171,9 @@ function buildSignupEmbed(session) {
     const classes = info.classes || { TANK: null, HEAL: null, DPS: null };
 
     const parts = [];
-    if (roles.has('TANK')) parts.push(`🛡️ ${classLabel(classes.TANK)}`);
-    if (roles.has('HEAL')) parts.push(`💚 ${classLabel(classes.HEAL)}`);
-    if (roles.has('DPS'))  parts.push(`⚔️ ${classLabel(classes.DPS)}`);
+    if (roles.has('TANK')) parts.push(`🛡️ ${classes.TANK ? classIcon(classes.TANK) : '—'}`);
+    if (roles.has('HEAL')) parts.push(`💚 ${classes.HEAL ? classIcon(classes.HEAL) : '—'}`);
+    if (roles.has('DPS'))  parts.push(`⚔️ ${classes.DPS ? classIcon(classes.DPS) : '—'}`);
 
     return `• ${name}  |  ${parts.length ? parts.join('  ') : 'No roles selected'}`;
   });
@@ -207,8 +242,9 @@ for (const c of WOW_CLASSES) {
 
   menu.addOptions(
     new StringSelectMenuOptionBuilder()
-      .setLabel(c.label)
-      .setValue(c.id)
+  .setLabel(c.label)
+  .setValue(c.id)
+  .setEmoji(CLASS_EMOJI_OBJ[c.id])
   );
 }
 
