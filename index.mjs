@@ -136,6 +136,33 @@ const ROLE_CLASSES = {
   DPS:  new Set(WOW_CLASSES.map(c => c.id)) // all classes can DPS
 };
 
+const LUST_CLASSES = new Set(['SHAMAN', 'MAGE', 'HUNTER', 'EVOKER']);
+const BREZ_CLASSES = new Set(['DRUID', 'DEATH_KNIGHT', 'WARLOCK', 'PALADIN']);
+
+function getAssignedClass(player, roleKey) {
+  if (!player) return null;
+  const classes = player.classes || {};
+  return classes[roleKey] || null;
+}
+
+function groupUtilityFlags(g) {
+  const classIds = [];
+
+  const tankClass = getAssignedClass(g.tank, 'TANK');
+  const healClass = getAssignedClass(g.heal, 'HEAL');
+  if (tankClass) classIds.push(tankClass);
+  if (healClass) classIds.push(healClass);
+
+  for (const p of [g.dps1, g.dps2, g.dps3]) {
+    const dpsClass = getAssignedClass(p, 'DPS');
+    if (dpsClass) classIds.push(dpsClass);
+  }
+
+  return {
+    hasLust: classIds.some(c => LUST_CLASSES.has(c)),
+    hasBrez: classIds.some(c => BREZ_CLASSES.has(c)),
+  };
+}
 function classLabel(classId) {
   return WOW_CLASSES.find(c => c.id === classId)?.label || 'Unset';
 }
@@ -304,7 +331,19 @@ for (const c of WOW_CLASSES) {
     ? dpsPlayers.map(p => `${playerClassIconForRole(p, 'DPS')} ${p.name}`).join(', ')
     : '—';
 
-  lines.push(
+  const util = groupUtilityFlags(g);
+  const lustMark = util.hasLust ? '✅' : '❌';
+  const brezMark = util.hasBrez ? '✅' : '❌';
+
+ lines.push(
+  `**Group ${idx + 1}**\n` +
+  `🛡️ ${tank}\n` +
+  `💚 ${heal}\n` +
+  `⚔️ ${dps}\n` +
+  `🩸 Lust: ${lustMark}   ☠️ Brez: ${brezMark}\n`
+);
+
+lines.push(
     `**Group ${idx + 1}**\n` +
     `🛡️ ${tank}\n` +
     `💚 ${heal}\n` +
@@ -330,7 +369,7 @@ function rollGroups(signups, desiredGroups = null, attempts = 200) {
     id,
     name: info.displayName || `<@${id}>`,
     roles: new Set(info.roles || []),
-    classes: info.classes || {} // <-- ADD THIS
+    classes: info.classes || {} 
   }));
 
   const tanks = players.filter(p => p.roles.has('TANK')).length;
