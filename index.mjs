@@ -341,13 +341,6 @@ for (const c of WOW_CLASSES) {
   `💚 ${heal}\n` +
   `⚔️ ${dps}\n` +
   `🩸 Lust: ${lustMark}   ☠️ Brez: ${brezMark}\n`
-);
-
-lines.push(
-    `**Group ${idx + 1}**\n` +
-    `🛡️ ${tank}\n` +
-    `💚 ${heal}\n` +
-    `⚔️ ${dps}\n`
   );
 });
 
